@@ -32,7 +32,8 @@ Mesh::Mesh(const std::string &filename) : numverts_(0), numfaces_(0)
                     ifs >> dummy;
                     coords.push_back(dummy);
                 }
-            }else if(s=="f")
+            }
+            else if(s=="f")
             {
                 string line ="";
                 getline(ifs, line);

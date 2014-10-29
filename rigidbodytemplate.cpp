@@ -2,6 +2,11 @@
 #include "mesh.h"
 #include <iostream>
 #include <Eigen/Dense>
+#include "vectormath.h"
+#include "collisions/CTCD.h"
+#include "collisions/Distance.h"
+#include <fstream>
+#include <map>
 
 using namespace std;
 using namespace Eigen;
@@ -19,7 +24,11 @@ RigidBodyTemplate::RigidBodyTemplate(std::string &meshFilename) : volume_(0)
     double r = boundingSphereRadius();
     m_->scale(1.0/r);
     volume_ /= r*r*r;
-    computeInertiaTensor();    
+    computeInertiaTensor();
+    if (meshFilename != "resources/bunny.obj")
+    {
+        computeSignedDistanceField(meshFilename);
+    }
 }
 
 RigidBodyTemplate::~RigidBodyTemplate()
@@ -134,4 +143,120 @@ void RigidBodyTemplate::computeInertiaTensor()
         principAxes_[i] = es.eigenvectors().col(i);
         principAxes_[i].normalize();
     }
+}
+
+bool RigidBodyTemplate::insideTemplate(Vector3d point)
+{
+    Vector3d pointEnd;
+    int evenCount = 0;
+    int oddCount = 0;
+    bool inside = false;
+    double time = 0;
+    for (int rayNo = 1; rayNo <= 10; rayNo++)
+    {
+        pointEnd.setZero();
+        pointEnd<<VectorMath::randomUnitIntervalReal()*2 - 1, VectorMath::randomUnitIntervalReal()*2 - 1, VectorMath::randomUnitIntervalReal()*2 - 1;
+        pointEnd = pointEnd * 2.1;
+        inside = false;
+        for (int faceNo = 0; faceNo < m_->getNumFaces(); faceNo++)
+        {
+            if (CTCD::vertexFaceCTCD(point, m_->getVert(m_->getFace(faceNo)[0]), m_->getVert(m_->getFace(faceNo)[1]), m_->getVert(m_->getFace(faceNo)[2]),
+                                     pointEnd, m_->getVert(m_->getFace(faceNo)[0]), m_->getVert(m_->getFace(faceNo)[1]), m_->getVert(m_->getFace(faceNo)[2]), 10e-8, time))
+            {
+                inside = !inside;
+            }
+        }
+        if (inside)
+            oddCount++;
+        else
+            evenCount++;
+    }
+    if (evenCount > oddCount)
+        return false;
+    else
+        return true;
+}
+
+double RigidBodyTemplate::shortestDistanceFromPointToM(Vector3d point)
+{
+    double minimumDistance = numeric_limits<double>::max();
+    double baryIgnore1 = 0;
+    double baryIgnore2 = 0;
+    double baryIgnore3 = 0;
+    for (int faceNo = 0; faceNo < m_->getNumFaces(); faceNo++)
+    {
+        Vector3d dist = Distance::vertexFaceDistance(point, m_->getVert(m_->getFace(faceNo)[0]), m_->getVert(m_->getFace(faceNo)[1]), m_->getVert(m_->getFace(faceNo)[2]),
+                                                   baryIgnore1, baryIgnore2, baryIgnore3);
+        if (dist.norm() < minimumDistance)
+        {
+            minimumDistance = dist.norm();
+        }
+    }
+    return minimumDistance;
+}
+
+void RigidBodyTemplate::computeSignedDistanceField(string meshFileName)
+{
+    meshFileName = meshFileName.substr(0, meshFileName.length() - 3) + "sdf";
+    ifstream inputFileStream(meshFileName.c_str());
+    if (inputFileStream.good())
+    {
+        inputFileStream.close();
+        initializeSignedDistanceField(meshFileName);
+        return;
+    }
+    ofstream outputFileStream(meshFileName.c_str(), ofstream::out);
+    outputFileStream<<"30"<<endl;
+    for (int xIndex = 0; xIndex < 30; xIndex++)
+    {
+        for (int yIndex = 0; yIndex < 30; yIndex++)
+        {
+            for (int zIndex = 0; zIndex < 30; zIndex++)
+            {
+                Vector3d point;
+                point<<(xIndex/29.0)*2-1,(yIndex/29.0)*2-1,(zIndex/29.0)*2-1;
+                double distance = shortestDistanceFromPointToM(point);
+                if (insideTemplate(point))
+                {
+                    distance = distance * -1;
+                }
+                outputFileStream<<distance<<" ";
+//                cout<<"Distance : "<<distance;
+            }
+        }
+    }
+    outputFileStream.close();
+    initializeSignedDistanceField(meshFileName);
+}
+
+void RigidBodyTemplate::initializeSignedDistanceField(string fileName)
+{
+    ifstream inputFileStream(fileName.c_str());
+    inputFileStream >> noOfCubes_;
+    int x = 0;
+    int y = 0;
+    int z = 0;
+    while (inputFileStream)
+    {
+        inputFileStream >> signedDistMap_[x][y][z];
+        z++;
+        if (z == 30)
+        {
+            z = 0;
+            y++;
+        }
+        if (y == 30)
+        {
+            y = 0;
+            x++;
+        }
+        if (x == 30)
+        {
+            break;
+            x++;
+        }
+    }
+    cout<<signedDistMap_[0][0][0]<<endl;
+    cout<<signedDistMap_[29][29][29]<<endl;
+    inputFileStream.close();
 }
