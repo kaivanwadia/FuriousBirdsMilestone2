@@ -7,6 +7,7 @@
 #include "collisions/Distance.h"
 #include <fstream>
 #include <map>
+#include "vectormath.h"
 
 using namespace std;
 using namespace Eigen;
@@ -25,10 +26,10 @@ RigidBodyTemplate::RigidBodyTemplate(std::string &meshFilename) : volume_(0)
     m_->scale(1.0/r);
     volume_ /= r*r*r;
     computeInertiaTensor();
-    if (meshFilename != "resources/bunny.obj")
-    {
-        computeSignedDistanceField(meshFilename);
-    }
+    noOfCubes_ = 29;
+    cubeSideLength_ = 2;
+    subCubeSideLength_ = cubeSideLength_/noOfCubes_;
+    computeSignedDistanceField(meshFilename);
 }
 
 RigidBodyTemplate::~RigidBodyTemplate()
@@ -206,22 +207,21 @@ void RigidBodyTemplate::computeSignedDistanceField(string meshFileName)
         return;
     }
     ofstream outputFileStream(meshFileName.c_str(), ofstream::out);
-    outputFileStream<<"30"<<endl;
-    for (int xIndex = 0; xIndex < 30; xIndex++)
+    outputFileStream<<noOfCubes_+1<<endl;
+    for (int xIndex = 0; xIndex <= noOfCubes_; xIndex++)
     {
-        for (int yIndex = 0; yIndex < 30; yIndex++)
+        for (int yIndex = 0; yIndex <= noOfCubes_; yIndex++)
         {
-            for (int zIndex = 0; zIndex < 30; zIndex++)
+            for (int zIndex = 0; zIndex <= noOfCubes_; zIndex++)
             {
                 Vector3d point;
-                point<<(xIndex/29.0)*2-1,(yIndex/29.0)*2-1,(zIndex/29.0)*2-1;
+                point<<(xIndex/noOfCubes_)*2-1,(yIndex/noOfCubes_)*2-1,(zIndex/noOfCubes_)*2-1;
                 double distance = shortestDistanceFromPointToM(point);
                 if (insideTemplate(point))
                 {
                     distance = distance * -1;
                 }
                 outputFileStream<<distance<<" ";
-//                cout<<"Distance : "<<distance;
             }
         }
     }
@@ -233,30 +233,35 @@ void RigidBodyTemplate::initializeSignedDistanceField(string fileName)
 {
     ifstream inputFileStream(fileName.c_str());
     inputFileStream >> noOfCubes_;
+    noOfCubes_ = noOfCubes_ - 1;
+    subCubeSideLength_ = cubeSideLength_/noOfCubes_;
     int x = 0;
     int y = 0;
     int z = 0;
+    double signedDistance = 0;
     while (inputFileStream)
     {
-        inputFileStream >> signedDistMap_[x][y][z];
+        inputFileStream >> signedDistance;
+        signedDistMap_[VectorMath::computeMapIndex(x, y, z)] = signedDistance;
         z++;
-        if (z == 30)
+        if (z == noOfCubes_+1)
         {
             z = 0;
             y++;
         }
-        if (y == 30)
+        if (y == noOfCubes_+1)
         {
             y = 0;
             x++;
         }
-        if (x == 30)
+        if (x == noOfCubes_+1)
         {
             break;
             x++;
         }
     }
-    cout<<signedDistMap_[0][0][0]<<endl;
-    cout<<signedDistMap_[29][29][29]<<endl;
+//    cout<<signedDistMap_[0]<<endl;
+//    cout<<signedDistMap_[292929]<<endl;
+//    cout<<signedDistMap_.size()<<endl;
     inputFileStream.close();
 }

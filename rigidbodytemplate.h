@@ -19,7 +19,10 @@ public:
     const Eigen::Vector3d getPrincipleAxis(int axis) const {return principAxes_[axis];}
 
     const Eigen::Matrix3d getInertiaTensor() const {return inertiaTensor_;}
-    const int getNoOfCubes() const {return noOfCubes_;}
+    const double getNoOfCubes() const {return noOfCubes_;}
+    const double getCubeSideLength() const {return cubeSideLength_;}
+    const double getSubCubeSideLength() const {return subCubeSideLength_;}
+    const std::map<double, double> getSignedDistanceField() const {return signedDistMap_;}
 
 private:
     RigidBodyTemplate(const RigidBodyTemplate &other);
@@ -42,8 +45,10 @@ private:
     Eigen::Matrix3d inertiaTensor_;
     Eigen::Vector3d principAxes_[3];
 
-    double signedDistMap_[30][30][30];
-    int noOfCubes_;
+    std::map<double, double> signedDistMap_;
+    double noOfCubes_;
+    double cubeSideLength_;
+    double subCubeSideLength_;
 };
 
 #endif // RIGIDBODYTEMPLATE_H

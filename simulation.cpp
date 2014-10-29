@@ -326,3 +326,13 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
     }
 }
 
+double Simulation::computeSignedDistancePointToBody(Vector3d point, RigidBodyInstance body)
+{
+    Vector3d q = VectorMath::rotationMatrix(-1*body.theta) * (point - body.c);
+    if (q.norm() > 1.1)
+    {
+        return numeric_limits<double>::max();
+    }
+
+}
+

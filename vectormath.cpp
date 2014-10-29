@@ -83,3 +83,8 @@ const Matrix3d VectorMath::DrotVector(const Vector3d &axisangle, const Vector3d 
     Matrix3d result = -R * crossProductMatrix(rotatingVector) * TMatrix(axisangle);
     return result;
 }
+
+double VectorMath::computeMapIndex(int i, int j, int k)
+{
+    return k + (j*100) + (i*10000);
+}
