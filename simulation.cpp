@@ -343,8 +343,8 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
             {
                 Vector3d templatePoint = body.getTemplate().getMesh().getVert(pID);
                 Vector3d embPoint = body.c + bodyRotMatrix*templatePoint;
-                double checkValue = computeSignedDistancePointToBody(embPoint, m2Body);
-                if (checkValue >= 0)
+                double checkValueSignedDistance = computeSignedDistancePointToBody(embPoint, m2Body);
+                if (checkValueSignedDistance >= 0)
                 {
                     continue;
                 }
@@ -356,14 +356,14 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
                 {
                     epsilon = 1;
                 }
-                Vector3d gradDwrtC1 = -bodyRotMatrix*gradDwrtQ;
-                Vector3d gradDwrtT1 = VectorMath::DrotVector(-body.theta, m2BodyRotMatrix*templatePoint + m2Body.c - body.c).transpose()*gradDwrtQ;
-                Vector3d gradDwrtC2 = bodyRotMatrix*gradDwrtQ;
-                Vector3d gradDwrtT2 = VectorMath::DrotVector(m2Body.theta, templatePoint).transpose()*bodyRotMatrix*gradDwrtQ;
-                forceC1 = forceC1 + epsilon * checkValue * (-gradDwrtC1);
-                forceT1 = forceT1 + epsilon * checkValue * (-gradDwrtT1);
-                forceC2 = forceC2 + epsilon * checkValue * (-gradDwrtC2);
-                forceT2 = forceT2 + epsilon * checkValue * (-gradDwrtT2);
+                Vector3d gradDwrtC1 = m2BodyRotMatrix*gradDwrtQ;
+                Vector3d gradDwrtT1 = VectorMath::DrotVector(body.theta, templatePoint).transpose()*m2BodyRotMatrix*gradDwrtQ;
+                Vector3d gradDwrtC2 = -m2BodyRotMatrix*gradDwrtQ;
+                Vector3d gradDwrtT2 = VectorMath::DrotVector(-1*m2Body.theta, bodyRotMatrix*templatePoint + body.c - m2Body.c).transpose()*gradDwrtQ;
+                forceC1 = forceC1 + epsilon * checkValueSignedDistance * (-gradDwrtC1);
+                forceT1 = forceT1 + epsilon * checkValueSignedDistance * (-gradDwrtT1);
+                forceC2 = forceC2 + epsilon * checkValueSignedDistance * (-gradDwrtC2);
+                forceT2 = forceT2 + epsilon * checkValueSignedDistance * (-gradDwrtT2);
             }
             double kByVerts = params_.penaltyStiffness/noOfVerts;
             Fc.segment<3>(3*bodyidx) += forceC1*kByVerts;
