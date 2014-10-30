@@ -36,6 +36,7 @@ public:
     void clearScene();
     void addRigidBody(Eigen::Vector3d pos, Eigen::Vector3d lookdir);
     double computeSignedDistancePointToBody(Eigen::Vector3d point, RigidBodyInstance body);
+    Eigen::Vector3d signedDistanceGrad(Eigen::Vector3d point, RigidBodyInstance body);
 
 private:
     void loadFloorTexture();

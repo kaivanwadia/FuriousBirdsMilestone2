@@ -284,15 +284,15 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
     for(int bodyidx=0; bodyidx<(int)bodies_.size(); bodyidx++)
     {
         RigidBodyInstance &body = *bodies_[bodyidx];
-
+        Matrix3d bodyRotMatrix = VectorMath::rotationMatrix(body.theta);
         if(params_.activeForces & SimParameters::F_GRAVITY)
             Fc[3*bodyidx+2] += params_.gravityG*body.density*body.getTemplate().getVolume();
 
         Matrix3d rot = VectorMath::rotationMatrix(body.theta);
 
 
-        int nverts = body.getTemplate().getMesh().getNumVerts();
-        for(int i=0; i<nverts; i++)
+        int noOfVerts = body.getTemplate().getMesh().getNumVerts();
+        for(int i=0; i<noOfVerts; i++)
         {
             double epsilon = params_.coeffRestitution;
             const Vector3d pt = body.getTemplate().getMesh().getVert(i);
@@ -318,10 +318,58 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
                 if (checkValue < 0)
                 {
                     double planeStiffness = params_.penaltyStiffness;
-                    Fc.segment<3>(3*bodyidx) += -epsilon*planeStiffness*checkValue*planes_[planeID].normal/nverts;
-                    Ftheta.segment<3>(3*bodyidx) += -epsilon*planeStiffness*checkValue/nverts * VectorMath::DrotVector(body.theta, pt).transpose()*planes_[planeID].normal;
+                    Fc.segment<3>(3*bodyidx) += -epsilon*planeStiffness*checkValue*planes_[planeID].normal/noOfVerts;
+                    Ftheta.segment<3>(3*bodyidx) += -epsilon*planeStiffness*checkValue/noOfVerts * VectorMath::DrotVector(body.theta, pt).transpose()*planes_[planeID].normal;
                 }
             }
+        }
+        for (int m2BodyIdx = 0; m2BodyIdx < (int)bodies_.size(); m2BodyIdx++)
+        {
+            if (bodyidx == m2BodyIdx)
+            {
+                continue;
+            }
+            RigidBodyInstance &m2Body = *bodies_[m2BodyIdx];
+            Matrix3d m2BodyRotMatrix = VectorMath::rotationMatrix(m2Body.theta);
+            if ((m2Body.c - body.c).norm() > 2)
+            {
+                continue;
+            }
+            Vector3d forceC1(0,0,0);
+            Vector3d forceT1(0,0,0);
+            Vector3d forceC2(0,0,0);
+            Vector3d forceT2(0,0,0);
+            for (int pID = 0; pID < noOfVerts; pID++)
+            {
+                Vector3d templatePoint = body.getTemplate().getMesh().getVert(pID);
+                Vector3d embPoint = body.c + bodyRotMatrix*templatePoint;
+                double checkValue = computeSignedDistancePointToBody(embPoint, m2Body);
+                if (checkValue >= 0)
+                {
+                    continue;
+                }
+                double epsilon = params_.coeffRestitution;
+                Vector3d relativeVelocity = (body.cvel + body.w.cross(bodyRotMatrix*templatePoint))
+                                            - (m2Body.cvel + m2Body.w.cross(body.c + bodyRotMatrix*templatePoint - m2Body.c));
+                Vector3d gradDwrtQ = signedDistanceGrad(embPoint, m2Body);
+                if (relativeVelocity.dot(gradDwrtQ) < 0)
+                {
+                    epsilon = 1;
+                }
+                Vector3d gradDwrtC1 = -bodyRotMatrix*gradDwrtQ;
+                Vector3d gradDwrtT1 = VectorMath::DrotVector(-body.theta, m2BodyRotMatrix*templatePoint + m2Body.c - body.c).transpose()*gradDwrtQ;
+                Vector3d gradDwrtC2 = bodyRotMatrix*gradDwrtQ;
+                Vector3d gradDwrtT2 = VectorMath::DrotVector(m2Body.theta, templatePoint).transpose()*bodyRotMatrix*gradDwrtQ;
+                forceC1 = forceC1 + epsilon * checkValue * (-gradDwrtC1);
+                forceT1 = forceT1 + epsilon * checkValue * (-gradDwrtT1);
+                forceC2 = forceC2 + epsilon * checkValue * (-gradDwrtC2);
+                forceT2 = forceT2 + epsilon * checkValue * (-gradDwrtT2);
+            }
+            double kByVerts = params_.penaltyStiffness/noOfVerts;
+            Fc.segment<3>(3*bodyidx) += forceC1*kByVerts;
+            Ftheta.segment<3>(3*bodyidx) += forceT1*kByVerts;
+            Fc.segment<3>(3*m2BodyIdx) += forceC2*kByVerts;
+            Ftheta.segment<3>(3*m2BodyIdx) += forceT2*kByVerts;
         }
     }
 }
@@ -329,10 +377,65 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
 double Simulation::computeSignedDistancePointToBody(Vector3d point, RigidBodyInstance body)
 {
     Vector3d q = VectorMath::rotationMatrix(-1*body.theta) * (point - body.c);
-    if (q.norm() > 1.1)
+    if (q.norm() > 1.0)
     {
         return numeric_limits<double>::max();
     }
+    double subCubeLength = body.getTemplate().getSubCubeSideLength();
+    double cubeLength = body.getTemplate().getCubeSideLength();
+    Vector3d temp(-cubeLength/2,-cubeLength/2,-cubeLength/2);
+    Vector3d dXYZ = q - temp;
+    double i = floor(dXYZ[0]/subCubeLength);
+    double j = floor(dXYZ[1]/subCubeLength);
+    double k = floor(dXYZ[2]/subCubeLength);
+    if (i == 29)
+    {
+        i--;
+    }
+    if (j == 29)
+    {
+        j--;
+    }
+    if (k == 29)
+    {
+        k--;
+    }
+    double SbyL = (dXYZ[0] - i*subCubeLength)/subCubeLength;
+    double TbyL = (dXYZ[1] - j*subCubeLength)/subCubeLength;
+    double UbyL = (dXYZ[2] - k*subCubeLength)/subCubeLength;
+    double signedDistance = UbyL*(TbyL*( SbyL*body.getTemplate().getSignedDistance(i+1, j+1, k+1) + (1-SbyL)*body.getTemplate().getSignedDistance(i, j+1, k+1) )
+                                  + (1-TbyL)*( SbyL*body.getTemplate().getSignedDistance(i+1, j, k+1) + (1-SbyL)*body.getTemplate().getSignedDistance(i, j, k+1) ))
+                            + (1-UbyL)*(TbyL*( SbyL*body.getTemplate().getSignedDistance(i+1, j+1, k) + (1-SbyL)*body.getTemplate().getSignedDistance(i, j+1, k) )
+                                  + (1-TbyL)*( SbyL*body.getTemplate().getSignedDistance(i+1, j, k) + (1-SbyL)*body.getTemplate().getSignedDistance(i, j, k) ));
+    return signedDistance;
+}
 
+Vector3d Simulation::signedDistanceGrad(Vector3d point, RigidBodyInstance body)
+{
+    Vector3d q = VectorMath::rotationMatrix(-1*body.theta) * (point - body.c);
+    if (q.norm() > 1.1)
+    {
+        return Vector3d(numeric_limits<double>::max(), numeric_limits<double>::max(), numeric_limits<double>::max());
+    }
+    double L = body.getTemplate().getSubCubeSideLength();
+    double cubeLength = body.getTemplate().getCubeSideLength();
+    Vector3d dXYZ = q - Vector3d(-cubeLength/2,-cubeLength/2,-cubeLength/2);
+    double i = floor(dXYZ[0]/L);
+    double j = floor(dXYZ[1]/L);
+    double k = floor(dXYZ[2]/L);
+    double S = dXYZ[0] - i*L;
+    double T = dXYZ[1] - j*L;
+    double U = dXYZ[2] - k*L;
+    Vector3d gradQ;
+    gradQ.setZero();
+    gradQ[0] = (U/(L*L*L)) * (T*body.getTemplate().getSignedDistance(i+1, j+1, k+1) - T*body.getTemplate().getSignedDistance(i, j+1, k+1) + (L-T)*body.getTemplate().getSignedDistance(i+1, j, k+1) + (T-L)*body.getTemplate().getSignedDistance(i, j, k+1))
+            + ((L-U)/(L*L*L)) * (T*body.getTemplate().getSignedDistance(i+1, j+1, k) - T*body.getTemplate().getSignedDistance(i, j+1, k) + (L-T)*body.getTemplate().getSignedDistance(i+1, j, k) + (T-L)*body.getTemplate().getSignedDistance(i, j, k));
+    gradQ[1] = (U/(L*L*L)) * (S*body.getTemplate().getSignedDistance(i+1, j+1, k+1) + (L-S)*body.getTemplate().getSignedDistance(i, j+1, k+1) - S*body.getTemplate().getSignedDistance(i+1, j, k+1) + (S-L)*body.getTemplate().getSignedDistance(i, j, k+1))
+            + ((L-U)/(L*L*L)) * (S*body.getTemplate().getSignedDistance(i+1, j+1, k) + (L-S)*body.getTemplate().getSignedDistance(i, j+1, k) - S*body.getTemplate().getSignedDistance(i+1, j, k) + (S-L)*body.getTemplate().getSignedDistance(i, j, k));
+    gradQ[2] = (1/L)*((T/L)*( (S/L)*body.getTemplate().getSignedDistance(i+1, j+1, k+1) + ((L-S)/L)*body.getTemplate().getSignedDistance(i, j+1, k+1) )
+                    + ((L-T)/L)*( (S/L)*body.getTemplate().getSignedDistance(i+1, j, k+1) + ((L-S)/L)*body.getTemplate().getSignedDistance(i, j, k+1) ))
+              - (1/L)*((T/L)*((S/L)*body.getTemplate().getSignedDistance(i+1, j+1, k) + ((L-S)/L)*body.getTemplate().getSignedDistance(i, j+1, k) )
+                    + ((L-T)/L)*( (S/L)*body.getTemplate().getSignedDistance(i+1, j, k) + ((L-S)/L)*body.getTemplate().getSignedDistance(i, j, k) ));
+    return gradQ;
 }
 

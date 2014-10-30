@@ -242,7 +242,7 @@ void RigidBodyTemplate::initializeSignedDistanceField(string fileName)
     while (inputFileStream)
     {
         inputFileStream >> signedDistance;
-        signedDistMap_[VectorMath::computeMapIndex(x, y, z)] = signedDistance;
+        signedDistMap_[computeMapIndex(x, y, z)] = signedDistance;
         z++;
         if (z == noOfCubes_+1)
         {
@@ -264,4 +264,16 @@ void RigidBodyTemplate::initializeSignedDistanceField(string fileName)
 //    cout<<signedDistMap_[292929]<<endl;
 //    cout<<signedDistMap_.size()<<endl;
     inputFileStream.close();
+}
+
+double RigidBodyTemplate::getSignedDistance(double i, double j, double k) const
+{
+    double index = computeMapIndex(i, j, k);
+    return signedDistMap_.at(index);
+}
+
+double RigidBodyTemplate::computeMapIndex(double i, double j, double k) const
+{
+//    cout<<"Index : "<<(k + (j*100) + (i*10000))<<endl;
+    return k + (j*100) + (i*10000);
 }

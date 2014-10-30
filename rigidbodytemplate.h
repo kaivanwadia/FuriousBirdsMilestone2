@@ -22,7 +22,7 @@ public:
     const double getNoOfCubes() const {return noOfCubes_;}
     const double getCubeSideLength() const {return cubeSideLength_;}
     const double getSubCubeSideLength() const {return subCubeSideLength_;}
-    const std::map<double, double> getSignedDistanceField() const {return signedDistMap_;}
+    double getSignedDistance(double i, double j, double k) const;
 
 private:
     RigidBodyTemplate(const RigidBodyTemplate &other);
@@ -38,6 +38,7 @@ private:
     void computeSignedDistanceField(std::string meshFilename);
 
     void initializeSignedDistanceField(std::string fileName);
+    double computeMapIndex(double i, double j, double k) const;
 
     Mesh *m_;
 
