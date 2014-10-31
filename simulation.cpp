@@ -211,6 +211,7 @@ void Simulation::takeSimulationStep()
             newwguess += deltaw;
         }
         body.w = newwguess;
+        computeFrictionForces();
     }
 }
 
@@ -300,6 +301,16 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
 
             for (int planeID = 0; planeID < planes_.size(); planeID++)
             {
+                double bodyPlaneDist = (body.c - planes_[planeID].pos).dot(planes_[planeID].normal);
+                if (bodyPlaneDist > 1)
+                {
+                    continue;
+                }
+                double checkValue = (embpt - planes_[planeID].pos).dot(planes_[planeID].normal);
+                if (checkValue >= 0)
+                {
+                    continue;
+                }
                 double velocity = (body.cvel + body.w.cross(VectorMath::rotationMatrix(body.theta)*pt)).dot(planes_[planeID].normal);
                 if (velocity<=0)
                 {
@@ -309,18 +320,16 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
                 {
                     epsilon = params_.coeffRestitution;
                 }
-                double bodyPlaneDist = (body.c - planes_[planeID].pos).dot(planes_[planeID].normal);
-                if (bodyPlaneDist > 1)
-                {
-                    continue;
-                }
-                double checkValue = (embpt - planes_[planeID].pos).dot(planes_[planeID].normal);
-                if (checkValue < 0)
-                {
-                    double planeStiffness = params_.penaltyStiffness;
-                    Fc.segment<3>(3*bodyidx) += -epsilon*planeStiffness*checkValue*planes_[planeID].normal/noOfVerts;
-                    Ftheta.segment<3>(3*bodyidx) += -epsilon*planeStiffness*checkValue/noOfVerts * VectorMath::DrotVector(body.theta, pt).transpose()*planes_[planeID].normal;
-                }
+                double planeStiffness = params_.penaltyStiffness;
+                Fc.segment<3>(3*bodyidx) += -epsilon*planeStiffness*checkValue*planes_[planeID].normal/noOfVerts;
+                Ftheta.segment<3>(3*bodyidx) += -epsilon*planeStiffness*checkValue/noOfVerts * VectorMath::DrotVector(body.theta, pt).transpose()*planes_[planeID].normal;
+
+                Vector3d tangent1(1, 1, -(planes_[planeID].normal[0] + planes_[planeID].normal[1])/planes_[planeID].normal[2]);
+                Vector3d tangent2 = planes_[planeID].normal.cross(tangent1);
+                tangent1 = tangent1/tangent1.norm();
+                tangent2 = tangent2/tangent2.norm();
+                Impulse *impulse = new Impulse(bodyidx, embpt, planes_[planeID].normal, tangent1, tangent2, params_.timeStep*(-epsilon*planeStiffness*checkValue*planes_[planeID].normal/noOfVerts).norm());
+                impulses_.push_back(impulse);
             }
         }
         for (int m2BodyIdx = 0; m2BodyIdx < (int)bodies_.size(); m2BodyIdx++)
@@ -364,6 +373,13 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
                 forceT1 = forceT1 + epsilon * checkValueSignedDistance * (-gradDwrtT1);
                 forceC2 = forceC2 + epsilon * checkValueSignedDistance * (-gradDwrtC2);
                 forceT2 = forceT2 + epsilon * checkValueSignedDistance * (-gradDwrtT2);
+
+                Vector3d tangent1(1, 1, -(gradDwrtQ[0] + gradDwrtQ[1])/gradDwrtQ[2]);
+                Vector3d tangent2 = gradDwrtQ.cross(tangent1);
+                tangent1 = tangent1/tangent1.norm();
+                tangent2 = tangent2/tangent2.norm();
+                Impulse *impulse = new Impulse(bodyidx, m2BodyIdx, embPoint, gradDwrtQ, tangent1, tangent2, params_.timeStep*(forceC1.norm() + forceC2.norm()));
+                impulses_.push_back(impulse);
             }
             double kByVerts = params_.penaltyStiffness/noOfVerts;
             Fc.segment<3>(3*bodyidx) += forceC1*kByVerts;
@@ -372,6 +388,39 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
             Ftheta.segment<3>(3*m2BodyIdx) += forceT2*kByVerts;
         }
     }
+}
+
+void Simulation::computeFrictionForces()
+{
+    VectorXd XVectorofLamdaXis(impulses_.size()*2);
+    XVectorofLamdaXis.setZero();
+    MatrixXd BMatrixofTs(3, impulses_.size()*2);
+    BMatrixofTs.setZero();
+    MatrixXd PMatrix(6*bodies_.size(), 3);
+    PMatrix.setZero();
+    MatrixXd KMatrix(6*bodies_.size(), 2*impulses_.size());
+    KMatrix.setZero();
+    VectorXd velsAfterForces(6*bodies_.size());
+    velsAfterForces.setZero();
+    MatrixXd QconstantsMatrix(6*bodies_.size(), 6*bodies_.size());
+    QconstantsMatrix.setZero();
+    Matrix3d RhoI;
+    RhoI.setIdentity();
+    RhoI = RhoI * params_.bodyDensity;
+    Matrix3d RhoRMiR;
+    for (int bodyId = 0; bodyId < bodies_.size(); bodyId++)
+    {
+        RigidBodyInstance &body = *bodies_[bodyId];
+        RhoI = RhoI * body.getTemplate().getVolume();
+        RhoRMiR = params_.bodyDensity * VectorMath::rotationMatrix(body.theta).transpose() * body.getTemplate().getInertiaTensor() * VectorMath::rotationMatrix(body.theta);
+        QconstantsMatrix.block<3,3>(6*bodyId, 6*bodyId) = RhoI;
+        QconstantsMatrix.block<3,3>(6*bodyId+3, 6*bodyId+3) = RhoRMiR;
+        velsAfterForces.segment<3>(6*bodyId) = body.cvel;
+        velsAfterForces.segment<3>(6*bodyId+3) = body.w;
+    }
+    double AforQuadEq, BforQuadEq;
+    double CforQuadEq = velsAfterForces.transpose() * QconstantsMatrix * velsAfterForces;
+
 }
 
 double Simulation::computeSignedDistancePointToBody(Vector3d point, RigidBodyInstance body)

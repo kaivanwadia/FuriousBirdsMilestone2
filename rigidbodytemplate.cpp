@@ -239,6 +239,8 @@ void RigidBodyTemplate::initializeSignedDistanceField(string fileName)
     int y = 0;
     int z = 0;
     double signedDistance = 0;
+    signedDistMap_.resize(pow(noOfCubes_+1,3));
+    signedDistMap_.setZero();
     while (inputFileStream)
     {
         inputFileStream >> signedDistance;
@@ -269,11 +271,10 @@ void RigidBodyTemplate::initializeSignedDistanceField(string fileName)
 double RigidBodyTemplate::getSignedDistance(double i, double j, double k) const
 {
     double index = computeMapIndex(i, j, k);
-    return signedDistMap_.at(index);
+    return signedDistMap_(index);
 }
 
 double RigidBodyTemplate::computeMapIndex(double i, double j, double k) const
 {
-//    cout<<"Index : "<<(k + (j*100) + (i*10000))<<endl;
-    return k + (j*100) + (i*10000);
+    return i*30*30 + j*30 + k;
 }

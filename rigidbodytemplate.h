@@ -46,7 +46,7 @@ private:
     Eigen::Matrix3d inertiaTensor_;
     Eigen::Vector3d principAxes_[3];
 
-    std::map<double, double> signedDistMap_;
+    Eigen::VectorXd signedDistMap_;
     double noOfCubes_;
     double cubeSideLength_;
     double subCubeSideLength_;
