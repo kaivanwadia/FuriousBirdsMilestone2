@@ -10,7 +10,7 @@
 #include "vectormath.h"
 #include <Eigen/Dense>
 #include "mesh.h"
-
+#include "quadprog/eiquadprog.hpp"
 const double PI = 3.1415926535898;
 
 using namespace Eigen;
@@ -211,7 +211,11 @@ void Simulation::takeSimulationStep()
             newwguess += deltaw;
         }
         body.w = newwguess;
-        computeFrictionForces();
+        if(impulses_.size()>0)
+        {
+
+            computeFrictionForces();
+        }
     }
 }
 
@@ -279,6 +283,7 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
     Ftheta.resize(3*bodies_.size());
     Fc.setZero();
     Ftheta.setZero();
+    impulses_.clear();
 
     Vector3d z(0,0,1);
 
@@ -324,7 +329,7 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
                 Fc.segment<3>(3*bodyidx) += -epsilon*planeStiffness*checkValue*planes_[planeID].normal/noOfVerts;
                 Ftheta.segment<3>(3*bodyidx) += -epsilon*planeStiffness*checkValue/noOfVerts * VectorMath::DrotVector(body.theta, pt).transpose()*planes_[planeID].normal;
 
-                Vector3d tangent1(1, 1, -(planes_[planeID].normal[0] + planes_[planeID].normal[1])/planes_[planeID].normal[2]);
+                Vector3d tangent1 = VectorMath::perpToAxis(planes_[planeID].normal);
                 Vector3d tangent2 = planes_[planeID].normal.cross(tangent1);
                 tangent1 = tangent1/tangent1.norm();
                 tangent2 = tangent2/tangent2.norm();
@@ -374,11 +379,11 @@ void Simulation::computeForces(VectorXd &Fc, VectorXd &Ftheta)
                 forceC2 = forceC2 + epsilon * checkValueSignedDistance * (-gradDwrtC2);
                 forceT2 = forceT2 + epsilon * checkValueSignedDistance * (-gradDwrtT2);
 
-                Vector3d tangent1(1, 1, -(gradDwrtQ[0] + gradDwrtQ[1])/gradDwrtQ[2]);
+                Vector3d tangent1 = VectorMath::perpToAxis(gradDwrtQ);
                 Vector3d tangent2 = gradDwrtQ.cross(tangent1);
                 tangent1 = tangent1/tangent1.norm();
                 tangent2 = tangent2/tangent2.norm();
-                Impulse *impulse = new Impulse(bodyidx, m2BodyIdx, embPoint, gradDwrtQ, tangent1, tangent2, params_.timeStep*(forceC1.norm() + forceC2.norm()));
+                Impulse *impulse = new Impulse(bodyidx, m2BodyIdx, embPoint, gradDwrtQ, tangent1, tangent2, params_.timeStep*(forceC1.norm()));
                 impulses_.push_back(impulse);
             }
             double kByVerts = params_.penaltyStiffness/noOfVerts;
@@ -394,9 +399,9 @@ void Simulation::computeFrictionForces()
 {
     VectorXd XVectorofLamdaXis(impulses_.size()*2);
     XVectorofLamdaXis.setZero();
-    MatrixXd BMatrixofTs(3, impulses_.size()*2);
+    MatrixXd BMatrixofTs(3*impulses_.size(), impulses_.size()*2);
     BMatrixofTs.setZero();
-    MatrixXd PMatrix(6*bodies_.size(), 3);
+    MatrixXd PMatrix(6*bodies_.size(), 3*impulses_.size());
     PMatrix.setZero();
     MatrixXd KMatrix(6*bodies_.size(), 2*impulses_.size());
     KMatrix.setZero();
@@ -418,9 +423,61 @@ void Simulation::computeFrictionForces()
         velsAfterForces.segment<3>(6*bodyId) = body.cvel;
         velsAfterForces.segment<3>(6*bodyId+3) = body.w;
     }
-    double AforQuadEq, BforQuadEq;
-    double CforQuadEq = velsAfterForces.transpose() * QconstantsMatrix * velsAfterForces;
+    Matrix3d Identity;
+    Identity.setIdentity();
+    for(int impulseId =0; impulseId < impulses_.size();  impulseId++)
+    {
+        Impulse &impulse = *impulses_[impulseId];
+        BMatrixofTs.block<3,1>(3*impulseId,2*impulseId) = impulse.tangent1;
+        BMatrixofTs.block<3,1>(3*impulseId, 2*impulseId+1) = impulse.tangent2;
 
+
+        RigidBodyInstance &body1 = *bodies_[impulse.body1];
+        RigidBodyInstance &body2 = *bodies_[impulse.body2];
+
+        if(impulse.body1 == impulse.body2)
+        {
+            Matrix3d stuff1 = (1/params_.bodyDensity)*(VectorMath::crossProductMatrix(impulse.impactPoint)*VectorMath::rotationMatrix(-body1.theta)*body1.getTemplate().getInertiaTensor().inverse()*VectorMath::rotationMatrix(-body1.theta).inverse());
+
+            PMatrix.block<3,3>(6*impulse.body1, 3*impulseId)= Identity*(1.0/body1.getTemplate().getVolume()*params_.bodyDensity);
+            PMatrix.block<3,3>(6*impulse.body1+3,3*impulseId) =stuff1;
+        }
+        else
+        {
+            Matrix3d stuff1 = (1/params_.bodyDensity)*(VectorMath::crossProductMatrix(impulse.impactPoint)*VectorMath::rotationMatrix(-body1.theta)*body1.getTemplate().getInertiaTensor().inverse()*VectorMath::rotationMatrix(-body1.theta).inverse());
+            Matrix3d stuff2 = (1/params_.bodyDensity)*(VectorMath::crossProductMatrix(impulse.impactPoint)*VectorMath::rotationMatrix(-body2.theta)*body2.getTemplate().getInertiaTensor().inverse()*VectorMath::rotationMatrix(-body2.theta).inverse());
+
+            PMatrix.block<3,3>(6*impulse.body1, 3*impulseId)= Identity*(1.0/body1.getTemplate().getVolume()*params_.bodyDensity);
+            PMatrix.block<3,3>(6*impulse.body1+3,3*impulseId) = stuff1;
+            PMatrix.block<3,3>(6*impulse.body2, 3*impulseId)= Identity*(1.0/body2.getTemplate().getVolume()*params_.bodyDensity);
+            PMatrix.block<3,3>(6*impulse.body2+3,3*impulseId) = stuff2;
+        }
+    }
+    KMatrix = PMatrix * BMatrixofTs;
+    VectorXd ce0;
+    VectorXd ci0;
+    MatrixXd CE;
+    MatrixXd CI;
+    MatrixXd G(2*impulses_.size(), 2*impulses_.size());
+    G.setZero();
+    G= 2*(KMatrix.transpose()*QconstantsMatrix*KMatrix);
+    VectorXd g0 = 2*KMatrix.transpose()*QconstantsMatrix*velsAfterForces;
+    cout<<"G:\n"<<G<<endl;
+    cout<<"g0:\n"<<g0<<endl;
+//    VectorXd g0 = velsAfterForces.transpose()*QconstantsMatrix*PMatrix*BMatrixofTs*2;
+    Eigen::solve_quadprog(G, g0, CE, ce0, CI, ci0, XVectorofLamdaXis);
+
+    VectorXd J = BMatrixofTs*XVectorofLamdaXis;
+    cout<<"X:\n"<<XVectorofLamdaXis<<endl;
+//    cout<<"J:\n"<<J<<endl;
+    VectorXd deltaV = PMatrix*J;
+
+    for(int bodyId=0; bodyId<bodies_.size(); bodyId++)
+    {
+         RigidBodyInstance &body = *bodies_[bodyId];
+         body.cvel += deltaV.segment<3>(3*bodyId);
+         body.w += deltaV.segment<3>(3*(bodyId+1));
+    }
 }
 
 double Simulation::computeSignedDistancePointToBody(Vector3d point, RigidBodyInstance body)
@@ -487,4 +544,3 @@ Vector3d Simulation::signedDistanceGrad(Vector3d point, RigidBodyInstance body)
                     + ((L-T)/L)*( (S/L)*body.getTemplate().getSignedDistance(i+1, j, k) + ((L-S)/L)*body.getTemplate().getSignedDistance(i, j, k) ));
     return gradQ;
 }
-

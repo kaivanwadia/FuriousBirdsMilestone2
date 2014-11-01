@@ -39,7 +39,7 @@ struct Impulse
     Impulse(int body1, Eigen::Vector3d impactPoint, Eigen::Vector3d contactNormal, Eigen::Vector3d tangent1, Eigen::Vector3d tangent2, double impulseMagnitude)
     {
         this->body1 = body1;
-        this->body2 = NULL;
+        this->body2 = body1;
         this->impactPoint = impactPoint;
         this->contactNormal = contactNormal;
         this->tangent1 = tangent1;
