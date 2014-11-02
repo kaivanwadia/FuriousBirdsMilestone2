@@ -74,6 +74,7 @@ public:
     double computeSignedDistancePointToBody(Eigen::Vector3d point, RigidBodyInstance body);
     Eigen::Vector3d signedDistanceGrad(Eigen::Vector3d point, RigidBodyInstance body);
     void computeFrictionForces();
+    void computeFrictionForcesW();
 
 private:
     void loadFloorTexture();

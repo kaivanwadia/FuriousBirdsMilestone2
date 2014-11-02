@@ -215,6 +215,7 @@ void Simulation::takeSimulationStep()
         {
 
             computeFrictionForces();
+            computeFrictionForcesW();
         }
     }
 }
@@ -462,21 +463,182 @@ void Simulation::computeFrictionForces()
     G.setZero();
     G= 2*(KMatrix.transpose()*QconstantsMatrix*KMatrix);
     VectorXd g0 = 2*KMatrix.transpose()*QconstantsMatrix*velsAfterForces;
-    cout<<"G:\n"<<G<<endl;
-    cout<<"g0:\n"<<g0<<endl;
+    MatrixXd I(2*impulses_.size(), 2*impulses_.size());
+    I.setIdentity();
+    I *= 1e-6;
+
+    G = G + I;
+//    cout<<"B Matrix :\n"<<BMatrixofTs<<endl;
+//    cout<<"G:\n"<<G<<endl;
+//    cout<<"g0:\n"<<g0<<endl;
+//    cout<<"Vels after F : \n"<<velsAfterForces<<endl;
 //    VectorXd g0 = velsAfterForces.transpose()*QconstantsMatrix*PMatrix*BMatrixofTs*2;
     Eigen::solve_quadprog(G, g0, CE, ce0, CI, ci0, XVectorofLamdaXis);
 
     VectorXd J = BMatrixofTs*XVectorofLamdaXis;
-    cout<<"X:\n"<<XVectorofLamdaXis<<endl;
+//    cout<<"X:\n"<<XVectorofLamdaXis<<endl;
 //    cout<<"J:\n"<<J<<endl;
     VectorXd deltaV = PMatrix*J;
 
     for(int bodyId=0; bodyId<bodies_.size(); bodyId++)
     {
          RigidBodyInstance &body = *bodies_[bodyId];
-         body.cvel += deltaV.segment<3>(3*bodyId);
-         body.w += deltaV.segment<3>(3*(bodyId+1));
+         body.cvel += deltaV.segment<3>(6*bodyId);
+         body.w += deltaV.segment<3>(6*bodyId+3);
+    }
+}
+
+
+//void Simulation::computeFrictionForces()
+//{
+//    VectorXd XVectorofLamdaXis(impulses_.size()*2);
+//    XVectorofLamdaXis.setZero();
+//    MatrixXd BMatrixofTs(3*impulses_.size(), impulses_.size()*2);
+//    BMatrixofTs.setZero();
+//    MatrixXd PMatrix(3*bodies_.size(), 3*impulses_.size());
+//    PMatrix.setZero();
+//    MatrixXd KMatrix(3*bodies_.size(), 2*impulses_.size());
+//    KMatrix.setZero();
+//    VectorXd velsAfterForces(3*bodies_.size());
+//    velsAfterForces.setZero();
+//    MatrixXd QconstantsMatrix(3*bodies_.size(), 3*bodies_.size());
+//    QconstantsMatrix.setZero();
+//    Matrix3d RhoI;
+//    RhoI.setIdentity();
+//    Matrix3d RhoRMiR;
+//    for (int bodyId = 0; bodyId < bodies_.size(); bodyId++)
+//    {
+//        RigidBodyInstance &body = *bodies_[bodyId];
+//        RhoI = RhoI * body.getTemplate().getVolume() * params_.bodyDensity;
+//        QconstantsMatrix.block<3,3>(3*bodyId, 3*bodyId) = RhoI;
+//        velsAfterForces.segment<3>(3*bodyId) = body.cvel;
+//    }
+//    Matrix3d Identity;
+//    Identity.setIdentity();
+//    for(int impulseId =0; impulseId < impulses_.size();  impulseId++)
+//    {
+//        Impulse &impulse = *impulses_[impulseId];
+//        BMatrixofTs.block<3,1>(3*impulseId,2*impulseId) = impulse.tangent1;
+//        BMatrixofTs.block<3,1>(3*impulseId, 2*impulseId+1) = impulse.tangent2;
+
+
+//        RigidBodyInstance &body1 = *bodies_[impulse.body1];
+//        RigidBodyInstance &body2 = *bodies_[impulse.body2];
+
+//        if(impulse.body1 == impulse.body2)
+//        {
+//            Matrix3d stuff1 = (1/params_.bodyDensity)*(VectorMath::crossProductMatrix(impulse.impactPoint)*VectorMath::rotationMatrix(-body1.theta)*body1.getTemplate().getInertiaTensor().inverse()*VectorMath::rotationMatrix(-body1.theta).inverse());
+
+//            PMatrix.block<3,3>(3*impulse.body1, 3*impulseId)= Identity*(1.0/body1.getTemplate().getVolume()*params_.bodyDensity);
+//        }
+//        else
+//        {
+//            Matrix3d stuff1 = (1/params_.bodyDensity)*(VectorMath::crossProductMatrix(impulse.impactPoint)*VectorMath::rotationMatrix(-body1.theta)*body1.getTemplate().getInertiaTensor().inverse()*VectorMath::rotationMatrix(-body1.theta).inverse());
+//            Matrix3d stuff2 = (1/params_.bodyDensity)*(VectorMath::crossProductMatrix(impulse.impactPoint)*VectorMath::rotationMatrix(-body2.theta)*body2.getTemplate().getInertiaTensor().inverse()*VectorMath::rotationMatrix(-body2.theta).inverse());
+
+//            PMatrix.block<3,3>(3*impulse.body1, 3*impulseId) = Identity*(1.0/body1.getTemplate().getVolume()*params_.bodyDensity);
+//            PMatrix.block<3,3>(3*impulse.body2, 3*impulseId) = Identity*(1.0/body2.getTemplate().getVolume()*params_.bodyDensity);
+//        }
+//    }
+//    KMatrix = PMatrix * BMatrixofTs;
+//    VectorXd ce0;
+//    VectorXd ci0;
+//    MatrixXd CE;
+//    MatrixXd CI;
+//    MatrixXd G(2*impulses_.size(), 2*impulses_.size());
+//    G.setZero();
+//    G= 2*(KMatrix.transpose()*QconstantsMatrix*KMatrix);
+//    VectorXd g0 = 2*KMatrix.transpose()*QconstantsMatrix*velsAfterForces;
+////    cout<<"G:\n"<<G<<endl;
+////    cout<<"g0:\n"<<g0<<endl;
+////    cout<<"Vels after F : \n"<<velsAfterForces<<endl;
+////    VectorXd g0 = velsAfterForces.transpose()*QconstantsMatrix*PMatrix*BMatrixofTs*2;
+//    Eigen::solve_quadprog(G, g0, CE, ce0, CI, ci0, XVectorofLamdaXis);
+
+//    VectorXd J = BMatrixofTs*XVectorofLamdaXis;
+////    cout<<"X:\n"<<XVectorofLamdaXis<<endl;
+////    cout<<"J:\n"<<J<<endl;
+//    VectorXd deltaV = PMatrix*J;
+
+//    for(int bodyId=0; bodyId<bodies_.size(); bodyId++)
+//    {
+//         RigidBodyInstance &body = *bodies_[bodyId];
+//         body.cvel += deltaV.segment<3>(3*bodyId);
+//    }
+//}
+
+
+void Simulation::computeFrictionForcesW()
+{
+    VectorXd XVectorofLamdaXis(impulses_.size()*2);
+    XVectorofLamdaXis.setZero();
+    MatrixXd BMatrixofTs(3*impulses_.size(), impulses_.size()*2);
+    BMatrixofTs.setZero();
+    MatrixXd PMatrix(3*bodies_.size(), 3*impulses_.size());
+    PMatrix.setZero();
+    MatrixXd KMatrix(3*bodies_.size(), 2*impulses_.size());
+    KMatrix.setZero();
+    VectorXd velsAfterForces(3*bodies_.size());
+    velsAfterForces.setZero();
+    MatrixXd QconstantsMatrix(3*bodies_.size(), 3*bodies_.size());
+    QconstantsMatrix.setZero();
+    Matrix3d RhoRMiR;
+    for (int bodyId = 0; bodyId < bodies_.size(); bodyId++)
+    {
+        RigidBodyInstance &body = *bodies_[bodyId];
+        RhoRMiR = params_.bodyDensity * VectorMath::rotationMatrix(body.theta).transpose() * body.getTemplate().getInertiaTensor() * VectorMath::rotationMatrix(body.theta);
+        QconstantsMatrix.block<3,3>(3*bodyId, 3*bodyId) = RhoRMiR;
+        velsAfterForces.segment<3>(3*bodyId) = body.w;
+    }
+    for(int impulseId =0; impulseId < impulses_.size();  impulseId++)
+    {
+        Impulse &impulse = *impulses_[impulseId];
+        BMatrixofTs.block<3,1>(3*impulseId,2*impulseId) = impulse.tangent1;
+        BMatrixofTs.block<3,1>(3*impulseId, 2*impulseId+1) = impulse.tangent2;
+
+
+        RigidBodyInstance &body1 = *bodies_[impulse.body1];
+        RigidBodyInstance &body2 = *bodies_[impulse.body2];
+
+        if(impulse.body1 == impulse.body2)
+        {
+            Matrix3d stuff1 = (1/params_.bodyDensity)*(VectorMath::crossProductMatrix(VectorMath::rotationMatrix(body1.theta)*(impulse.impactPoint - body1.c))*VectorMath::rotationMatrix(-body1.theta)*body1.getTemplate().getInertiaTensor().inverse()*VectorMath::rotationMatrix(-body1.theta).inverse());
+
+            PMatrix.block<3,3>(3*impulse.body1, 3*impulseId) = stuff1;
+        }
+        else
+        {
+            Matrix3d stuff1 = (1/params_.bodyDensity)*(VectorMath::crossProductMatrix(VectorMath::rotationMatrix(body1.theta)*(impulse.impactPoint - body1.c))*VectorMath::rotationMatrix(-body1.theta)*body1.getTemplate().getInertiaTensor().inverse()*VectorMath::rotationMatrix(-body1.theta).inverse());
+            Matrix3d stuff2 = (1/params_.bodyDensity)*(VectorMath::crossProductMatrix(VectorMath::rotationMatrix(body1.theta)*(impulse.impactPoint - body1.c))*VectorMath::rotationMatrix(-body2.theta)*body2.getTemplate().getInertiaTensor().inverse()*VectorMath::rotationMatrix(-body2.theta).inverse());
+
+            PMatrix.block<3,3>(3*impulse.body1, 3*impulseId) = stuff1;
+            PMatrix.block<3,3>(3*impulse.body2, 3*impulseId) = stuff2;
+        }
+    }
+    KMatrix = PMatrix * BMatrixofTs;
+    VectorXd ce0;
+    VectorXd ci0;
+    MatrixXd CE;
+    MatrixXd CI;
+    MatrixXd G(2*impulses_.size(), 2*impulses_.size());
+    G.setZero();
+    G= 2*(KMatrix.transpose()*QconstantsMatrix*KMatrix);
+    VectorXd g0 = 2*KMatrix.transpose()*QconstantsMatrix*velsAfterForces;
+//    cout<<"G:\n"<<G<<endl;
+//    cout<<"g0:\n"<<g0<<endl;
+//    cout<<"Vels after F : \n"<<velsAfterForces<<endl;
+//    VectorXd g0 = velsAfterForces.transpose()*QconstantsMatrix*PMatrix*BMatrixofTs*2;
+    Eigen::solve_quadprog(G, g0, CE, ce0, CI, ci0, XVectorofLamdaXis);
+
+    VectorXd J = BMatrixofTs*XVectorofLamdaXis;
+//    cout<<"X:\n"<<XVectorofLamdaXis<<endl;
+//    cout<<"J:\n"<<J<<endl;
+    VectorXd deltaV = PMatrix*J;
+
+    for(int bodyId=0; bodyId<bodies_.size(); bodyId++)
+    {
+         RigidBodyInstance &body = *bodies_[bodyId];
+         body.w += deltaV.segment<3>(3*bodyId);
     }
 }
 

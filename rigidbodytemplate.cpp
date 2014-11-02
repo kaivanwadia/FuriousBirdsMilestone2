@@ -262,9 +262,6 @@ void RigidBodyTemplate::initializeSignedDistanceField(string fileName)
             x++;
         }
     }
-//    cout<<signedDistMap_[0]<<endl;
-//    cout<<signedDistMap_[292929]<<endl;
-//    cout<<signedDistMap_.size()<<endl;
     inputFileStream.close();
 }
 
