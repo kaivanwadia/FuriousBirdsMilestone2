@@ -8,7 +8,7 @@
 using namespace std;
 using namespace Eigen;
 
-Mesh::Mesh() : numverts_(0), numfaces_(0) {};
+Mesh::Mesh() : numverts_(0), numfaces_(0) {}
 
 Mesh::Mesh(const std::string &filename) : numverts_(0), numfaces_(0)
 {
@@ -17,7 +17,7 @@ Mesh::Mesh(const std::string &filename) : numverts_(0), numfaces_(0)
 
     ifstream ifs(filename.c_str());
 
-    if(filename=="resources/custom.obj")
+    if(filename=="resources/custom.obj" or filename=="resources/pyramid.obj")
     {
         while(ifs)
         {

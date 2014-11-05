@@ -236,6 +236,31 @@ void GLPanel::tick()
     c_.translateCenter(dir);
     c_.translateEye(dir);
 }
+void GLPanel::tick2()
+{
+
+    Vector3d right, up, center;
+    c_.getSpanningSet(right, up, center);
+    center[2] = 0;
+    center.normalize();
+    right[2] = 0;
+    right.normalize();
+    int fwdamt = 0;
+    if(translateDir_ & TD_FWD)
+        fwdamt++;
+    if(translateDir_ & TD_BACK)
+        fwdamt--;
+    Vector3d dir = fwdamt*center;
+    int rghtamt = 0;
+    if(translateDir_ & TD_LEFT)
+        rghtamt--;
+    if(translateDir_ & TD_RIGHT)
+        rghtamt++;
+    dir += rghtamt*right;
+    double dnorm = dir.norm();
+    if(dnorm != 0)
+        dir /= dnorm;
+}
 
 void GLPanel::keyReleaseEvent(QKeyEvent *ke)
 {

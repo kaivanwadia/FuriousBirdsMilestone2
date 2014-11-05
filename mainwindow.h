@@ -33,6 +33,8 @@ private slots:
 
     void on_startSimulationButton_clicked();
 
+    void on_startGameModeButton_clicked();
+
     void on_timeStepEdit_editingFinished();
 
     void on_newtonTolEdit_editingFinished();
@@ -75,6 +77,7 @@ private:
     Controller &cont_;
     Ui::MainWindow *ui;
     bool simRunning_;
+    bool gameRunning_;
     QTimer renderTimer_;
 
     void setParametersFromUI();

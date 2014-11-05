@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'mainwindow.ui'
 **
-** Created: Mon Oct 27 17:58:38 2014
+** Created: Mon Nov 3 19:12:58 2014
 **      by: Qt User Interface Compiler version 4.8.1
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
@@ -50,6 +50,7 @@ public:
     QHBoxLayout *horizontalLayout;
     QGroupBox *SimulationBox;
     QPushButton *startSimulationButton;
+    QPushButton *startGameModeButton;
     QGroupBox *SimParametersBox;
     QLabel *timeStepLabel;
     QLabel *newtonTolLabel;
@@ -144,6 +145,9 @@ public:
         startSimulationButton = new QPushButton(SimulationBox);
         startSimulationButton->setObjectName(QString::fromUtf8("startSimulationButton"));
         startSimulationButton->setGeometry(QRect(10, 40, 181, 27));
+        startGameModeButton = new QPushButton(SimulationBox);
+        startGameModeButton->setObjectName(QString::fromUtf8("startGameModeButton"));
+        startGameModeButton->setGeometry(QRect(10, 110, 181, 27));
 
         horizontalLayout->addWidget(SimulationBox);
 
@@ -317,6 +321,7 @@ public:
         simOptionsBox->setTitle(QApplication::translate("MainWindow", "Simulation Options", 0, QApplication::UnicodeUTF8));
         SimulationBox->setTitle(QApplication::translate("MainWindow", "Simulation Controls", 0, QApplication::UnicodeUTF8));
         startSimulationButton->setText(QApplication::translate("MainWindow", "Start Simulation", 0, QApplication::UnicodeUTF8));
+        startGameModeButton->setText(QApplication::translate("MainWindow", "Start Game Mode", 0, QApplication::UnicodeUTF8));
         SimParametersBox->setTitle(QApplication::translate("MainWindow", "Parameters", 0, QApplication::UnicodeUTF8));
         timeStepLabel->setText(QApplication::translate("MainWindow", "Time Step:", 0, QApplication::UnicodeUTF8));
         newtonTolLabel->setText(QApplication::translate("MainWindow", "Newton Tolerance:", 0, QApplication::UnicodeUTF8));

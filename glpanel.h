@@ -15,6 +15,7 @@ public:
     void setController(Controller *cont);
 
     void tick();
+    void tick2();
 
 signals:
 

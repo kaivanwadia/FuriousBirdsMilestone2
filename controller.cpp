@@ -41,6 +41,11 @@ void Controller::reset()
     clearScene();
 }
 
+void Controller::setupGameMode()
+{
+    sim_->setupGameMode();
+}
+
 void Controller::clearScene()
 {
     sim_->clearScene();

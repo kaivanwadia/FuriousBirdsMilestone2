@@ -11,6 +11,7 @@ MainWindow::MainWindow(Controller &cont, int fps, QWidget *parent) :
     ui->setupUi(this);
     ui->GLWidget->setController(&cont);
     simRunning_ = false;
+    gameRunning_ = false;
     connect(&renderTimer_, SIGNAL(timeout()), this, SLOT(updateGL()));
     renderTimer_.start(1000/fps);
 }
@@ -30,6 +31,7 @@ void MainWindow::setParametersFromUI()
     SimParameters params;
 
     params.simRunning = simRunning_;
+    params.gameRunning = gameRunning_;
 
     params.timeStep = ui->timeStepEdit->text().toDouble();
     params.NewtonTolerance = ui->newtonTolEdit->text().toDouble();
@@ -57,6 +59,8 @@ void MainWindow::setParametersFromUI()
     else if(ui->planeButton->isChecked())
         params.launchBody = SimParameters::R_PLANE;
 
+
+
     params.launchVel = ui->launchVelEdit->text().toDouble();
     params.randomLaunchAngVel = ui->randomAngularVelCheckBox->isChecked();
     params.randomLaunchOrientation = ui->randomOrienatationCheckBox->isChecked();
@@ -80,6 +84,14 @@ void MainWindow::setUIFromParameters(const SimParameters &params)
     {
         ui->startSimulationButton->setText(QString("Start Simulation"));
         simRunning_ = false;
+    }
+    if(params.gameRunning)
+    {
+        ui->startGameModeButton->setText(QString("Stop Game"));
+    }
+    else
+    {
+        ui->startGameModeButton->setText(QString("Start Game Mode"));
     }
 
     ui->timeStepEdit->setText(QString::number(params.timeStep));
@@ -123,7 +135,14 @@ void MainWindow::setUIFromParameters(const SimParameters &params)
 
 void MainWindow::updateGL()
 {
-    ui->GLWidget->tick();
+    if(gameRunning_)
+    {
+        ui->GLWidget->tick2();
+    }
+    else
+    {
+        ui->GLWidget->tick();
+    }
     ui->GLWidget->update();
 }
 
@@ -140,6 +159,21 @@ void MainWindow::on_actionReset_triggered()
 void MainWindow::on_startSimulationButton_clicked()
 {
     simRunning_ = !simRunning_;
+    setParametersFromUI();
+}
+
+void MainWindow::on_startGameModeButton_clicked()
+{
+    if(!simRunning_)
+    {
+        on_startSimulationButton_clicked();
+    }
+    QMetaObject::invokeMethod(&cont_, "clearScene");
+    gameRunning_ = !gameRunning_;
+    if(gameRunning_)
+    {
+        QMetaObject::invokeMethod(&cont_, "setupGameMode");
+    }
     setParametersFromUI();
 }
 

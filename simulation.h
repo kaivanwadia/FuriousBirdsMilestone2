@@ -74,7 +74,7 @@ public:
     double computeSignedDistancePointToBody(Eigen::Vector3d point, RigidBodyInstance body);
     Eigen::Vector3d signedDistanceGrad(Eigen::Vector3d point, RigidBodyInstance body);
     void computeFrictionForces();
-    void computeFrictionForcesW();
+    void setupGameMode();
 
 private:
     void loadFloorTexture();
@@ -97,6 +97,7 @@ private:
 
     std::vector<Plane> planes_;
     std::vector<Impulse *> impulses_;
+    bool gamewon;
 };
 
 #endif // SIMULATION_H

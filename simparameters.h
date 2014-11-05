@@ -13,8 +13,10 @@ struct SimParameters
     const static int R_BUNNY   = 2;
     const static int R_CUSTOM  = 3;
     const static int R_PLANE   = 4;
+    const static int R_PYRAMID = 5;
 
     bool simRunning;
+    bool gameRunning;
     double timeStep;
     double NewtonTolerance;
     int NewtonMaxIters;

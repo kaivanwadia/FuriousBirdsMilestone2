@@ -22,9 +22,15 @@ void RigidBodyInstance::render()
     glShadeModel(GL_SMOOTH);
     glDisable(GL_TEXTURE_2D);
     glEnable(GL_LIGHTING);
-    glColorMaterial ( GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE );
-    glEnable ( GL_COLOR_MATERIAL );
-    Vector3d color(0.6, 0.9, 0.9);
+     glEnable ( GL_COLOR_MATERIAL );
+    GLfloat lightColor[] = {0.6f, 0.6f, 0.6f, 1.0f};
+       //Diffuse (non-shiny) light component
+       glLightfv(GL_LIGHT0, GL_DIFFUSE, lightColor);
+       //Specular (shiny) light component
+       glLightfv(GL_LIGHT0, GL_SPECULAR, lightColor);
+       GLfloat mShininess[] = {128};
+       glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, mShininess);
+    Vector3d color(0.9, 0.9, 0.1);
     glColor4d(color[0], color[1], color[2], 1.0);
 
     glPushMatrix();
@@ -44,7 +50,6 @@ void RigidBodyInstance::render()
 
         glVertexPointer(3, GL_DOUBLE, 0, rbtemplate_.getMesh().getVertexPointer());
         glNormalPointer(GL_DOUBLE, 0, rbtemplate_.getMesh().getVertexNormalsPointer());
-
         glDrawElements(GL_TRIANGLES, rbtemplate_.getMesh().getNumFaces()*3, GL_UNSIGNED_INT, rbtemplate_.getMesh().getFacePointer());
 
         glDisableClientState(GL_VERTEX_ARRAY);

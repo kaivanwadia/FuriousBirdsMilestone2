@@ -3,6 +3,7 @@
 SimParameters::SimParameters()
 {
     simRunning = false;
+    gameRunning = false;
     timeStep = 0.001;
     NewtonMaxIters = 2000;
     NewtonTolerance = 1e-8;

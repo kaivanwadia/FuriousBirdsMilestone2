@@ -25,7 +25,7 @@ public slots:
     void clearScene();
     void updateParameters(SimParameters params);
     void mouseClicked(double x, double y, double z, double dx, double dy, double dz);
-
+    void setupGameMode();
     void simTick();
 
 protected:
