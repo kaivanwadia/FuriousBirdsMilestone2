@@ -1,6 +1,9 @@
 FuriousBirdsMilestone2
-by Kaivan and Vismay
-======================
+================================
+Kaivan and Vismay
+------------------------------------
+
+Designed and implemented code to simulate the behaviour of 3D rigid bodies in space. User can provide linear velocity, angular velocity and choose between different types of bodies. Features include collision and friction.
 
 Run the project by opening up birds.pro in QT and pressing 'run'.
 
